@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Family Chores Chart</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --amelia:#FF6B6B;--amelia-light:#FFE5E5;--amelia-dark:#C94040;
+    --nora:#4ECDC4;--nora-light:#E0F7F5;--nora-dark:#2A9D8F;
+    --stella:#FFD93D;--stella-light:#FFF8DC;--stella-dark:#E6A800;
+    --bg:#1A1A2E;--card:#16213E;--surf:#0F3460;
+    --text:#E8E8F0;--muted:#8888AA;--star:#FFD700;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;
+    background-image:radial-gradient(circle at 15% 20%,rgba(255,107,107,0.08) 0%,transparent 40%),
+    radial-gradient(circle at 85% 80%,rgba(78,205,196,0.08) 0%,transparent 40%);}
+  #loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:999;}
+  .spinner{width:44px;height:44px;border:3px solid var(--surf);border-top-color:var(--nora);border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .load-txt{font-family:'Fredoka One',cursive;color:var(--muted);font-size:1rem;}
+  #app{display:none;padding-top:36px;}
+  #sync-bar{position:fixed;top:0;left:0;right:0;background:var(--card);padding:6px 16px;display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:700;z-index:200;border-bottom:1px solid var(--surf);}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;}
+  .dot.ok{background:#4ECDC4;box-shadow:0 0 6px #4ECDC4;}
+  .dot.busy{background:#FFD93D;animation:pulse 1s infinite;}
+  .dot.err{background:#FF6B6B;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .bar-btn{background:none;border:1px solid var(--surf);color:var(--muted);padding:2px 10px;border-radius:7px;cursor:pointer;font-family:'Nunito',sans-serif;font-size:10px;font-weight:700;}
+  .bar-btn:hover{border-color:var(--amelia);color:var(--amelia);}
+  header{text-align:center;padding:18px 20px 10px;}
+  .hdr-row{display:flex;align-items:center;justify-content:center;gap:14px;}
+  .hdr-icon{font-size:2.1rem;animation:bounce 2s infinite;}
+  @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  h1{font-family:'Fredoka One',cursive;font-size:clamp(1.8rem,5vw,2.9rem);
+    background:linear-gradient(135deg,var(--amelia),var(--nora),var(--stella));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+  .date-str{font-size:10px;color:var(--muted);font-weight:700;margin-top:4px;letter-spacing:2px;text-transform:uppercase;}
+  .week-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:10px;}
+  .wk-btn{background:var(--surf);border:none;color:var(--text);padding:5px 16px;border-radius:18px;cursor:pointer;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;transition:all 0.2s;}
+  .wk-btn:hover{background:#1a4a80;}
+  .wk-lbl{font-family:'Fredoka One',cursive;font-size:14px;color:var(--muted);min-width:130px;text-align:center;}
+  .tabs{display:flex;justify-content:center;gap:8px;padding:8px 16px 14px;flex-wrap:wrap;}
+  .tab{padding:7px 18px;border-radius:40px;border:2.5px solid transparent;cursor:pointer;font-family:'Fredoka One',cursive;font-size:13px;transition:all 0.22s;background:var(--card);color:var(--muted);}
+  .tab.ta{background:var(--amelia-light);color:var(--amelia-dark);border-color:var(--amelia);}
+  .tab.tn{background:var(--nora-light);color:var(--nora-dark);border-color:var(--nora);}
+  .tab.ts{background:var(--stella-light);color:var(--stella-dark);border-color:var(--stella);}
+  .view{display:none;}
+  .view.on{display:block;}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:0 14px 20px;max-width:1400px;margin:0 auto;}
+  @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+  .panel{background:var(--card);border-radius:22px;overflow:hidden;border:2px solid transparent;}
+  .panel.a{border-color:var(--amelia);}.panel.n{border-color:var(--nora);}.panel.s{border-color:var(--stella);}
+  .ph{padding:14px 16px 10px;display:flex;align-items:center;gap:11px;}
+  .ph.a{background:linear-gradient(135deg,#FF6B6B20,#FF6B6B38);}
+  .ph.n{background:linear-gradient(135deg,#4ECDC420,#4ECDC438);}
+  .ph.s{background:linear-gradient(135deg,#FFD93D20,#FFD93D38);}
+  .av{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;}
+  .av.a{background:var(--amelia);}.av.n{background:var(--nora);}.av.s{background:var(--stella);}
+  .pn{font-family:'Fredoka One',cursive;font-size:1.25rem;line-height:1;}
+  .pn.a{color:var(--amelia);}.pn.n{color:var(--nora);}.pn.s{color:var(--stella);}
+  .page{font-size:10px;color:var(--muted);font-weight:700;margin-top:2px;}
+  .pst{display:flex;flex-direction:column;align-items:center;gap:1px;margin-left:auto;}
+  .stc{font-family:'Fredoka One',cursive;font-size:1.3rem;color:var(--star);}
+  .stl{font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;}
+  .prog{padding:5px 13px 9px;}
+  .prog-txt{font-size:10px;color:var(--muted);font-weight:700;margin-bottom:3px;}
+  .prog-bg{height:6px;background:#ffffff12;border-radius:6px;overflow:hidden;}
+  .prog-fill{height:100%;border-radius:6px;transition:width 0.5s ease;}
+  .pf-a{background:linear-gradient(90deg,var(--amelia-dark),var(--amelia));}
+  .pf-n{background:linear-gradient(90deg,var(--nora-dark),var(--nora));}
+  .pf-s{background:linear-gradient(90deg,var(--stella-dark),var(--stella));}
+  .days{padding:0 11px 11px;}
+  .dlbl{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:8px 0 3px;}
+  .dlbl.today{color:var(--star);}
+  .chore{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;margin-bottom:4px;background:#ffffff08;cursor:pointer;transition:all 0.18s;}
+  .chore:hover{background:#ffffff14;transform:translateX(3px);}
+  .chore.done{opacity:0.45;}
+  .chore.done .ctxt{text-decoration:line-through;}
+  .chore.done .cbox{background:currentColor;}
+  .chore.ca{color:var(--amelia);}.chore.cn{color:var(--nora);}.chore.cs{color:var(--stella);}
+  .cbox{width:20px;height:20px;border-radius:6px;border:2.5px solid currentColor;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;color:#fff;font-weight:900;transition:all 0.18s;}
+  .ctxt{font-size:12px;font-weight:700;color:var(--text);flex:1;}
+  .cst{font-size:10px;color:var(--star);}
+  .free{color:var(--muted);font-size:11px;padding:2px 9px;font-style:italic;}
+  .single-wrap{max-width:620px;margin:0 auto;padding:0 14px 20px;}
+  .lb-wrap{max-width:460px;margin:0 auto;padding:0 14px 20px;}
+  .lb-title{font-family:'Fredoka One',cursive;font-size:1.7rem;text-align:center;color:var(--star);margin-bottom:14px;}
+  .lb-card{background:var(--card);border-radius:18px;padding:13px 16px;margin-bottom:11px;display:flex;align-items:center;gap:13px;border:2px solid transparent;transition:transform 0.2s;}
+  .lb-card:hover{transform:scale(1.02);}
+  .lb-rank{font-family:'Fredoka One',cursive;font-size:1.8rem;width:34px;text-align:center;}
+  .lb-bar-bg{height:5px;background:#ffffff12;border-radius:5px;overflow:hidden;margin-top:4px;}
+  .lb-bar-fill{height:100%;border-radius:5px;transition:width 0.5s;}
+  .lb-stars{font-family:'Fredoka One',cursive;font-size:1.5rem;color:var(--star);}
+  .fab{position:fixed;bottom:24px;right:24px;width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--amelia),var(--nora));border:none;color:#fff;font-size:1.6rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 22px rgba(0,0,0,0.4);transition:all 0.2s;z-index:100;}
+  .fab:hover{transform:scale(1.1) rotate(90deg);}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+  .modal-bg.open{opacity:1;pointer-events:all;}
+  .modal{background:var(--card);border-radius:22px;padding:24px;width:90%;max-width:380px;border:2px solid var(--surf);transform:scale(0.9);transition:transform 0.2s;}
+  .modal-bg.open .modal{transform:scale(1);}
+  .modal h3{font-family:'Fredoka One',cursive;font-size:1.35rem;color:var(--text);margin-bottom:14px;}
+  .modal label{display:block;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:5px;margin-top:11px;}
+  .modal select,.modal input{width:100%;background:var(--surf);border:none;color:var(--text);padding:9px 13px;border-radius:10px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;outline:none;}
+  .modal-btns{display:flex;gap:9px;margin-top:18px;}
+  .mbtn{flex:1;padding:11px;border:none;border-radius:12px;cursor:pointer;font-family:'Fredoka One',cursive;font-size:14px;transition:all 0.2s;}
+  .mbtn:hover{transform:scale(1.03);}
+  .mbtn-cancel{background:var(--surf);color:var(--muted);}
+  .mbtn-add{background:linear-gradient(135deg,var(--amelia),var(--nora));color:#fff;}
+  .cf-wrap{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;}
+  .cf{position:absolute;top:-12px;border-radius:2px;animation:cfall 1.5s ease-out forwards;}
+  @keyframes cfall{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="load-txt">Connecting...</div>
+</div>
+
+<div id="sync-bar" style="display:none">
+  <div><span class="dot ok" id="dot"></span><span id="sync-txt">Synced</span></div>
+  <div style="display:flex;gap:7px;align-items:center">
+    <span style="color:var(--muted);font-size:10px" id="sync-time"></span>
+    <button class="bar-btn" onclick="resetWeek()">🔄 Reset Week</button>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div class="hdr-row">
+      <span class="hdr-icon">🏠</span>
+      <h1>Family Chores Chart</h1>
+      <span class="hdr-icon" style="animation-delay:0.3s">⭐</span>
+    </div>
+    <div class="date-str" id="date-str"></div>
+    <div class="week-nav">
+      <button class="wk-btn" onclick="chgWeek(-1)">← Prev</button>
+      <div class="wk-lbl" id="wk-lbl">This Week</div>
+      <button class="wk-btn" onclick="chgWeek(1)">Next →</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab ta" id="tab-all"    onclick="setTab('all')">👨‍👩‍👧‍👦 All</div>
+    <div class="tab"    id="tab-amelia" onclick="setTab('amelia')">🎨 Amelia</div>
+    <div class="tab"    id="tab-nora"   onclick="setTab('nora')">🌊 Nora</div>
+    <div class="tab"    id="tab-stella" onclick="setTab('stella')">⭐ Stella</div>
+    <div class="tab"    id="tab-scores" onclick="setTab('scores')">🏆 Scores</div>
+  </div>
+
+  <div class="view on" id="view-all"><div class="grid" id="grid"></div></div>
+  <div class="view" id="view-amelia"><div class="single-wrap" id="s-amelia"></div></div>
+  <div class="view" id="view-nora">  <div class="single-wrap" id="s-nora"></div></div>
+  <div class="view" id="view-stella"><div class="single-wrap" id="s-stella"></div></div>
+  <div class="view" id="view-scores"><div class="lb-wrap" id="lb"></div></div>
+</div>
+
+<button class="fab" onclick="openModal()">+</button>
+
+<div class="modal-bg" id="modal" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>✨ Add a Chore</h3>
+    <label>Child</label>
+    <select id="m-child">
+      <option value="amelia">🎨 Amelia (14)</option>
+      <option value="nora">🌊 Nora (10)</option>
+      <option value="stella">⭐ Stella (7)</option>
+    </select>
+    <label>Chore Name</label>
+    <input id="m-name" placeholder="e.g. Wipe counters" onkeydown="if(event.key==='Enter')addChore()"/>
+    <label>Day</label>
+    <select id="m-day">
+      <option value="daily">Daily — every day</option>
+      <option value="0">Sunday</option><option value="1">Monday</option>
+      <option value="2">Tuesday</option><option value="3">Wednesday</option>
+      <option value="4">Thursday</option><option value="5">Friday</option>
+      <option value="6">Saturday</option>
+    </select>
+    <label>⭐ Stars</label>
+    <select id="m-stars">
+      <option value="1">1 star — Quick task</option>
+      <option value="2">2 stars — Regular chore</option>
+      <option value="3">3 stars — Big job</option>
+      <option value="5">5 stars — Extra effort</option>
+    </select>
+    <div class="modal-btns">
+      <button class="mbtn mbtn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="mbtn mbtn-add" onclick="addChore()">Add Chore ✨</button>
+    </div>
+  </div>
+</div>
+
+<div class="cf-wrap" id="cf"></div>
+
+<script>
+// ── HARDCODED CREDENTIALS ─────────────────────────────────
+const SB_URL = "https://dtntgyudfddbohqzburr.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0bnRneXVkZmRkYm9ocXpidXJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MzY0MTgsImV4cCI6MjA5NjMxMjQxOH0.OSONiO8dmyD_4oqiU2qjJ3wMNPHnlXZrVyYzWGGxbRI";
+
+// ── CONSTANTS ─────────────────────────────────────────────
+const KIDS=[
+  {id:"amelia",name:"Amelia",age:14,emoji:"🎨",cls:"a"},
+  {id:"nora",  name:"Nora",  age:10,emoji:"🌊",cls:"n"},
+  {id:"stella",name:"Stella",age:7, emoji:"⭐",cls:"s"},
+];
+const DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const DEFAULT_CHORES=[
+  {id:"a1",child:"amelia",name:"Make bed",          day:"daily",stars:1},
+  {id:"a2",child:"amelia",name:"Clean bathroom",    day:1,      stars:3},
+  {id:"a3",child:"amelia",name:"Do laundry",        day:3,      stars:3},
+  {id:"a4",child:"amelia",name:"Vacuum living room",day:5,      stars:2},
+  {id:"a5",child:"amelia",name:"Help with dinner",  day:"daily",stars:2},
+  {id:"a6",child:"amelia",name:"Mow lawn",          day:6,      stars:5},
+  {id:"n1",child:"nora",  name:"Make bed",          day:"daily",stars:1},
+  {id:"n2",child:"nora",  name:"Set the table",     day:"daily",stars:1},
+  {id:"n3",child:"nora",  name:"Empty dishwasher",  day:1,      stars:2},
+  {id:"n4",child:"nora",  name:"Empty dishwasher",  day:4,      stars:2},
+  {id:"n5",child:"nora",  name:"Clean bedroom",     day:5,      stars:2},
+  {id:"n6",child:"nora",  name:"Water plants",      day:3,      stars:1},
+  {id:"s1",child:"stella",name:"Make bed",          day:"daily",stars:1},
+  {id:"s2",child:"stella",name:"Pick up toys",      day:"daily",stars:1},
+  {id:"s3",child:"stella",name:"Feed the pet",      day:"daily",stars:2},
+  {id:"s4",child:"stella",name:"Help clear table",  day:"daily",stars:1},
+  {id:"s5",child:"stella",name:"Sort laundry",      day:6,      stars:2},
+];
+
+// ── STATE ─────────────────────────────────────────────────
+let sb, channel;
+let state={chores:JSON.parse(JSON.stringify(DEFAULT_CHORES)),completions:{},weekOffset:0};
+let curTab="all";
+
+// ── WEEK HELPERS ──────────────────────────────────────────
+function wkStart(off=0){const n=new Date(),s=new Date(n);s.setDate(n.getDate()-n.getDay()+off*7);s.setHours(0,0,0,0);return s;}
+function wkKey(off){const d=wkStart(off);return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;}
+function ck(id,di){return `${wkKey(state.weekOffset)}|${id}|${di}`;}
+function isDone(id,di){return !!state.completions[ck(id,di)];}
+
+// ── SUPABASE ──────────────────────────────────────────────
+async function loadDB(){
+  setSyncing(true);
+  try{
+    const {data,error}=await sb.from("chores_state").select("key,value");
+    if(error)throw error;
+    const map={};(data||[]).forEach(r=>{map[r.key]=r.value;});
+    if(map.chores)     state.chores     =JSON.parse(map.chores);
+    if(map.completions)state.completions=JSON.parse(map.completions);
+    if(map.weekOffset) state.weekOffset =JSON.parse(map.weekOffset);
+    setSynced();
+  }catch(e){setError();}
+}
+
+async function saveDB(keys=["chores","completions","weekOffset"]){
+  setSyncing(true);
+  try{
+    const rows=keys.map(k=>({key:k,value:JSON.stringify(state[k]),updated_at:new Date().toISOString()}));
+    const {error}=await sb.from("chores_state").upsert(rows,{onConflict:"key"});
+    if(error)throw error;
+    setSynced();
+  }catch(e){setError();}
+}
+
+function setSyncing(){
+  const d=document.getElementById("dot");
+  d.className="dot busy";
+  document.getElementById("sync-txt").textContent="Saving…";
+}
+function setSynced(){
+  const d=document.getElementById("dot");
+  d.className="dot ok";
+  document.getElementById("sync-txt").textContent="Synced";
+  document.getElementById("sync-time").textContent=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+  render();
+}
+function setError(){
+  document.getElementById("dot").className="dot err";
+  document.getElementById("sync-txt").textContent="Sync error";
+}
+
+function subscribe(){
+  channel=sb.channel("chores_rt")
+    .on("postgres_changes",{event:"*",schema:"public",table:"chores_state"},()=>loadDB())
+    .subscribe();
+}
+
+// ── INIT ─────────────────────────────────────────────────
+window.addEventListener("load",async()=>{
+  sb=supabase.createClient(SB_URL,SB_KEY);
+  await loadDB();
+  subscribe();
+  setInterval(()=>loadDB(),30000);
+  document.getElementById("loading").style.display="none";
+  document.getElementById("sync-bar").style.display="flex";
+  document.getElementById("app").style.display="block";
+  render();
+});
+
+// ── ACTIONS ───────────────────────────────────────────────
+async function toggleDone(id,di){
+  const k=ck(id,di);
+  if(state.completions[k])delete state.completions[k];
+  else{state.completions[k]=true;celebrate();}
+  render();
+  await saveDB(["completions"]);
+}
+async function chgWeek(d){state.weekOffset+=d;render();await saveDB(["weekOffset"]);}
+async function resetWeek(){
+  if(!confirm("Reset all progress for this week?"))return;
+  const p=wkKey(state.weekOffset);
+  Object.keys(state.completions).forEach(k=>{if(k.startsWith(p))delete state.completions[k];});
+  render();await saveDB(["completions"]);
+}
+async function addChore(){
+  const name=document.getElementById("m-name").value.trim();
+  if(!name){document.getElementById("m-name").focus();return;}
+  const child=document.getElementById("m-child").value;
+  const day=document.getElementById("m-day").value;
+  const stars=Number(document.getElementById("m-stars").value);
+  state.chores.push({id:"c"+Date.now(),child,name,day:day==="daily"?"daily":Number(day),stars});
+  closeModal();render();await saveDB(["chores"]);
+}
+
+// ── RENDER HELPERS ────────────────────────────────────────
+function starsEarned(child){
+  return state.chores.filter(c=>c.child===child).reduce((s,c)=>{
+    const ds=c.day==="daily"?[0,1,2,3,4,5,6]:[Number(c.day)];
+    return s+ds.filter(d=>isDone(c.id,d)).length*c.stars;
+  },0);
+}
+function possibleStars(child){
+  return state.chores.filter(c=>c.child===child).reduce((s,c)=>s+c.stars*(c.day==="daily"?7:1),0);
+}
+function dayChores(child,di){
+  return state.chores.filter(c=>c.child===child&&(c.day==="daily"||Number(c.day)===di));
+}
+
+function choreHTML(c,di,cls){
+  const done=isDone(c.id,di);
+  return `<div class="chore c${cls}${done?" done":""}" onclick="toggleDone('${c.id}',${di})">
+    <div class="cbox">${done?"✓":""}</div>
+    <span class="ctxt">${c.name}</span>
+    <span class="cst">${"⭐".repeat(c.stars)}</span>
+  </div>`;
+}
+
+function panelHTML(kid){
+  const k=KIDS.find(x=>x.id===kid);
+  const earned=starsEarned(kid),poss=possibleStars(kid);
+  const pct=poss?Math.round(earned/poss*100):0;
+  const ws=wkStart(state.weekOffset);
+  const today=new Date();today.setHours(0,0,0,0);
+  let daysHTML="";
+  for(let d=0;d<7;d++){
+    const dd=new Date(ws);dd.setDate(ws.getDate()+d);
+    const isToday=dd.getTime()===today.getTime();
+    const dc=dayChores(kid,d);
+    daysHTML+=`<div class="dlbl${isToday?" today":""}">${isToday?"📍 ":""}${DAYS[d]}${isToday?" — TODAY":""}</div>`;
+    daysHTML+=dc.length?dc.map(c=>choreHTML(c,d,k.cls)).join(""):`<div class="free">Free day! 🎉</div>`;
+  }
+  return `<div class="panel ${k.cls}">
+    <div class="ph ${k.cls}">
+      <div class="av ${k.cls}">${k.emoji}</div>
+      <div><div class="pn ${k.cls}">${k.name}</div><div class="page">Age ${k.age}</div></div>
+      <div class="pst"><div class="stc">⭐ ${earned}</div><div class="stl">${pct}% done</div></div>
+    </div>
+    <div class="prog">
+      <div class="prog-txt">${earned} of ${poss} stars this week</div>
+      <div class="prog-bg"><div class="prog-fill pf-${k.cls}" style="width:${pct}%"></div></div>
+    </div>
+    <div class="days">${daysHTML}</div>
+  </div>`;
+}
+
+// ── MAIN RENDER ───────────────────────────────────────────
+function render(){
+  const now=new Date();
+  document.getElementById("date-str").textContent=now.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+  const ws=wkStart(state.weekOffset),we=new Date(ws);we.setDate(ws.getDate()+6);
+  const fmt=d=>d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+  const wl=state.weekOffset===0?"This Week":state.weekOffset===-1?"Last Week":state.weekOffset===1?"Next Week":`${fmt(ws)} – ${fmt(we)}`;
+  document.getElementById("wk-lbl").textContent=wl;
+
+  document.getElementById("grid").innerHTML=KIDS.map(k=>panelHTML(k.id)).join("");
+  KIDS.forEach(k=>{const el=document.getElementById("s-"+k.id);if(el)el.innerHTML=panelHTML(k.id);});
+
+  const sorted=[...KIDS].map(k=>({...k,earned:starsEarned(k.id)})).sort((a,b)=>b.earned-a.earned);
+  const mx=Math.max(...sorted.map(k=>k.earned),1);
+  const medals=["🥇","🥈","🥉"],mc=["#FFD700","#C0C0C0","#CD7F32"];
+  const colMap={amelia:"var(--amelia)",nora:"var(--nora)",stella:"var(--stella)"};
+  document.getElementById("lb").innerHTML=`<div class="lb-title">🏆 Weekly Leaderboard</div>`+
+    sorted.map((k,i)=>`<div class="lb-card" style="border-color:${colMap[k.id]}">
+      <div class="lb-rank" style="color:${mc[i]}">${medals[i]}</div>
+      <div style="font-size:1.8rem">${k.emoji}</div>
+      <div style="flex:1">
+        <div style="font-family:'Fredoka One',cursive;font-size:1.2rem;color:${colMap[k.id]}">${k.name}</div>
+        <div class="lb-bar-bg"><div class="lb-bar-fill" style="width:${Math.round(k.earned/mx*100)}%;background:${colMap[k.id]}"></div></div>
+      </div>
+      <div class="lb-stars">⭐ ${k.earned}</div>
+    </div>`).join("");
+}
+
+// ── TABS ──────────────────────────────────────────────────
+function setTab(t){
+  curTab=t;
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
+  document.getElementById("view-"+t).classList.add("on");
+  document.querySelectorAll(".tab").forEach(el=>el.className="tab");
+  const map={all:"ta",amelia:"ta",nora:"tn",stella:"ts",scores:"ts"};
+  document.getElementById("tab-"+t).classList.add(map[t]);
+}
+
+// ── MODAL ─────────────────────────────────────────────────
+function openModal(){document.getElementById("modal").classList.add("open");document.getElementById("m-name").focus();}
+function closeModal(){document.getElementById("modal").classList.remove("open");document.getElementById("m-name").value="";}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+
+// ── CELEBRATE ─────────────────────────────────────────────
+function celebrate(){
+  const cols=["#FF6B6B","#4ECDC4","#FFD93D","#A8EDEA","#FED6E3","#fff"];
+  const wrap=document.getElementById("cf");wrap.innerHTML="";
+  for(let i=0;i<28;i++){
+    const p=document.createElement("div");p.className="cf";
+    p.style.cssText=`left:${Math.random()*100}vw;background:${cols[i%cols.length]};width:${7+Math.random()*9}px;height:${7+Math.random()*9}px;animation-duration:${0.9+Math.random()*0.7}s;animation-delay:${Math.random()*0.35}s`;
+    wrap.appendChild(p);
+  }
+  setTimeout(()=>wrap.innerHTML="",2400);
+}
+</script>
+</body>
+</html>
